@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brain Gym — 3 Games</title>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#181b24; --panel2:#20242f; --line:#2c3140;
+    --text:#eef0f5; --muted:#9aa1b2; --accent:#7c9cff; --good:#3ecf8e; --bad:#ff5d6c;
+    --c-red:#ff4d5e; --c-green:#2fd27a; --c-blue:#4d8dff; --c-yellow:#ffd23f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px 48px}
+  h1{font-size:28px;letter-spacing:-.5px}
+  .sub{color:var(--muted);margin:6px 0 22px;text-align:center}
+  .tabs{display:flex;gap:8px;background:var(--panel);padding:6px;border-radius:14px;margin-bottom:22px;flex-wrap:wrap;justify-content:center}
+  .tab{background:none;border:0;color:var(--muted);padding:10px 16px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+  .tab.active{background:var(--panel2);color:var(--text)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;width:100%;max-width:460px;text-align:center}
+  .game{display:none}.game.active{display:block}
+  .game h2{font-size:22px;margin-bottom:6px}
+  .how{color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:18px}
+  .stats{display:flex;justify-content:space-around;margin-bottom:18px}
+  .stat b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
+  .stat span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+  .btn{background:var(--accent);color:#0b1020;border:0;padding:12px 26px;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-top:18px}
+  .btn:active{transform:scale(.97)}
+  .msg{min-height:24px;margin-top:14px;font-weight:600}
+  .good{color:var(--good)}.bad{color:var(--bad)}
+
+  /* Memory Grid */
+  .mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:300px;margin:0 auto}
+  .mtile{aspect-ratio:1;border-radius:14px;background:var(--panel2);border:1px solid var(--line);cursor:pointer;transition:background .12s,transform .12s}
+  .mtile.lit{background:var(--accent);transform:scale(1.04);box-shadow:0 0 24px rgba(124,156,255,.5)}
+  .mtile.wrong{background:var(--bad)}
+  .mgrid.locked .mtile{cursor:default}
+
+  /* Stroop */
+  .rule{display:inline-block;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:.6px;margin-bottom:12px}
+  .rule.ink{background:#2a2f45;color:#c9d4ff}
+  .rule.word{background:#3a2b1f;color:#ffd7a8}
+  .sword{font-size:56px;font-weight:900;letter-spacing:2px;height:80px;line-height:80px;margin-bottom:16px}
+  .sbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .sbtn{padding:16px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+  .sbtn i{width:14px;height:14px;border-radius:50%;display:inline-block}
+  .sbtn:disabled{opacity:.4;cursor:default}
+  .bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-bottom:18px}
+  .bar div{height:100%;background:var(--accent);width:100%;transition:width .1s linear}
+
+  /* Number Trail */
+  .ngrid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;max-width:340px;margin:0 auto}
+  .ncell{aspect-ratio:1;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font-size:20px;font-weight:700;color:var(--text);cursor:pointer;font-variant-numeric:tabular-nums}
+  .ncell.done{background:transparent;color:#3b4152;border-color:transparent}
+  .ncell.miss{background:var(--bad)}
+  .ngrid.idle .ncell{color:transparent}
+
+  /* Quick Math */
+  .eq{font-size:44px;font-weight:800;height:70px;line-height:70px;margin-bottom:16px;font-variant-numeric:tabular-nums;transition:color .15s}
+  .eq.flash-good{color:var(--good)}.eq.flash-bad{color:var(--bad)}
+  .tf{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tf button{padding:18px;border-radius:12px;border:0;font-size:20px;font-weight:800;cursor:pointer}
+  .tf .yes{background:var(--good);color:#06210f}
+  .tf .no{background:var(--bad);color:#2a0509}
+  .tf button:disabled{opacity:.35;cursor:default}
+  .hint{color:var(--muted);font-size:12px;margin-top:10px}
+
+  /* Odd Color */
+  .ogrid{display:grid;gap:6px;max-width:340px;margin:0 auto;aspect-ratio:1}
+  .ocell{border-radius:8px;cursor:pointer;border:0}
+  .ogrid.idle .ocell{cursor:default}
+</style>
+</head>
+<body>
+  <h1>🧠 Brain Gym</h1>
+  <p class="sub">Three quick games for memory, focus and speed.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-g="memory">Memory Grid</button>
+    <button class="tab" data-g="stroop">Color Clash</button>
+    <button class="tab" data-g="trail">Number Trail</button>
+    <button class="tab" data-g="math">Quick Math</button>
+    <button class="tab" data-g="odd">Odd Color</button>
+  </div>
+
+  <div class="card">
+    <!-- GAME 1: Memory Grid -->
+    <section class="game active" id="memory">
+      <h2>Memory Grid</h2>
+      <p class="how">Watch the tiles light up, then tap them back in the same order. Every round adds one more step.</p>
+      <div class="stats">
+        <div class="stat"><b id="mLevel">0</b><span>Level</span></div>
+        <div class="stat"><b id="mBest">0</b><span>Best</span></div>
+      </div>
+      <div class="mgrid locked" id="mGrid"></div>
+      <div class="msg" id="mMsg"></div>
+      <button class="btn" id="mStart">Start</button>
+    </section>
+
+    <!-- GAME 2: Color Clash (Stroop) -->
+    <section class="game" id="stroop">
+      <h2>Color Clash</h2>
+      <p class="how">A color word appears in a clashing ink. Follow the rule badge: tap the <b>ink color</b> or the <b>word</b>. The rule can flip at any moment. 45 seconds.</p>
+      <div class="stats">
+        <div class="stat"><b id="sScore">0</b><span>Score</span></div>
+        <div class="stat"><b id="sStreak">0</b><span>Streak</span></div>
+        <div class="stat"><b id="sBest">0</b><span>Best</span></div>
+      </div>
+      <div class="bar"><div id="sBar"></div></div>
+      <div><span class="rule ink" id="sRule">TAP THE INK</span></div>
+      <div class="sword" id="sWord">READY?</div>
+      <div class="sbtns" id="sBtns"></div>
+      <div class="msg" id="sMsg"></div>
+      <button class="btn" id="sStart">Start</button>
+    </section>
+
+    <!-- GAME 3: Number Trail (Schulte table) -->
+    <section class="game" id="trail">
+      <h2>Number Trail</h2>
+      <p class="how">Tap 1 to 25 in order as fast as you can. Wrong taps add a 2-second penalty. Trains visual scanning and focus.</p>
+      <div class="stats">
+        <div class="stat"><b id="nNext">1</b><span>Find</span></div>
+        <div class="stat"><b id="nTime">0.0</b><span>Seconds</span></div>
+        <div class="stat"><b id="nBest">–</b><span>Best</span></div>
+      </div>
+      <div class="ngrid idle" id="nGrid"></div>
+      <div class="msg" id="nMsg"></div>
+      <button class="btn" id="nStart">Start</button>
+    </section>
+
+    <!-- GAME 4: Quick Math -->
+    <section class="game" id="math">
+      <h2>Quick Math</h2>
+      <p class="how">Is the equation correct? Tap <b>✓</b> or <b>✗</b> as fast as you can. Correct answers add time, wrong ones take it away, and the sums get harder as you go.</p>
+      <div class="stats">
+        <div class="stat"><b id="qScore">0</b><span>Score</span></div>
+        <div class="stat"><b id="qTime">20</b><span>Seconds</span></div>
+        <div class="stat"><b id="qBest">0</b><span>Best</span></div>
+      </div>
+      <div class="bar"><div id="qBar"></div></div>
+      <div class="eq" id="qEq">7 + 5 = 12</div>
+      <div class="tf">
+        <button class="yes" id="qYes" disabled>✓ True</button>
+        <button class="no" id="qNo" disabled>✗ False</button>
+      </div>
+      <div class="hint">Keyboard: ← true &nbsp;·&nbsp; → false</div>
+      <div class="msg" id="qMsg"></div>
+      <button class="btn" id="qStart">Start</button>
+    </section>
+
+    <!-- GAME 5: Odd Color -->
+    <section class="game" id="odd">
+      <h2>Odd Color</h2>
+      <p class="how">One tile is a slightly different shade. Find it! The grid grows and the difference shrinks each level. You have 3 lives and 60 seconds.</p>
+      <div class="stats">
+        <div class="stat"><b id="oLevel">0</b><span>Level</span></div>
+        <div class="stat"><b id="oLives">❤️❤️❤️</b><span>Lives</span></div>
+        <div class="stat"><b id="oTime">60</b><span>Seconds</span></div>
+        <div class="stat"><b id="oBest">0</b><span>Best</span></div>
+      </div>
+      <div class="ogrid idle" id="oGrid"></div>
+      <div class="msg" id="oMsg"></div>
+      <button class="btn" id="oStart">Start</button>
+    </section>
+  </div>
+
+<script>
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem('braingym_'+k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem('braingym_'+k, JSON.stringify(v)); }catch(e){} }
+};
+let actx;
+function beep(freq=440, dur=0.12){
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.frequency.value = freq; o.type = 'sine';
+    g.gain.setValueAtTime(0.12, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+    o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + dur);
+  }catch(e){}
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x===t));
+  document.querySelectorAll('.game').forEach(g => g.classList.toggle('active', g.id===t.dataset.g));
+});
+
+/* ================= GAME 1: MEMORY GRID ================= */
+(() => {
+  const grid = $('mGrid'), tones = [262,294,330,349,392,440,494,523,587];
+  let seq = [], pos = 0, accepting = false, level = 0, best = store.get('mem', 0);
+  $('mBest').textContent = best;
+  const tiles = [...Array(9)].map((_, i) => {
+    const d = document.createElement('div'); d.className = 'mtile';
+    d.onclick = () => tap(i); grid.appendChild(d); return d;
+  });
+  async function flash(i, ms){ tiles[i].classList.add('lit'); beep(tones[i]); await sleep(ms); tiles[i].classList.remove('lit'); }
+  async function play(){
+    accepting = false; grid.classList.add('locked');
+    $('mMsg').textContent = 'Watch…'; $('mMsg').className = 'msg';
+    await sleep(600);
+    const speed = Math.max(260, 560 - level * 22);
+    for(const i of seq){ await flash(i, speed); await sleep(140); }
+    pos = 0; accepting = true; grid.classList.remove('locked');
+    $('mMsg').textContent = 'Your turn';
+  }
+  function next(){
+    level++; $('mLevel').textContent = level;
+    let n; do{ n = Math.floor(Math.random()*9); } while(seq.length && n === seq[seq.length-1]);
+    seq.push(n); play();
+  }
+  async function tap(i){
+    if(!accepting) return;
+    if(i === seq[pos]){
+      flash(i, 180); pos++;
+      if(pos === seq.length){
+        accepting = false;
+        $('mMsg').textContent = 'Nice! ✓'; $('mMsg').className = 'msg good';
+        await sleep(500); next();
+      }
+    } else {
+      accepting = false; grid.classList.add('locked');
+      tiles[i].classList.add('wrong'); beep(110, .35);
+      const reached = level - 1;
+      if(reached > best){ best = reached; store.set('mem', best); $('mBest').textContent = best; }
+      $('mMsg').innerHTML = `Game over — you cleared <b>${reached}</b> level${reached===1?'':'s'}.`;
+      $('mMsg').className = 'msg bad';
+      await sleep(500); tiles[i].classList.remove('wrong');
+      // reveal the correct tile
+      await flash(seq[pos], 500);
+      $('mStart').style.display = ''; $('mStart').textContent = 'Play again';
+    }
+  }
+  $('mStart').onclick = () => {
+    $('mStart').style.display = 'none';
+    seq = []; level = 0; seq.push(Math.floor(Math.random()*9)); seq.push(Math.floor(Math.random()*9));
+    next();
+  };
+})();
+
+/* ================= GAME 2: COLOR CLASH ================= */
+(() => {
+  const COLORS = [
+    {name:'RED', v:'var(--c-red)'}, {name:'GREEN', v:'var(--c-green)'},
+    {name:'BLUE', v:'var(--c-blue)'}, {name:'YELLOW', v:'var(--c-yellow)'}
+  ];
+  const DURATION = 45;
+  let word, ink, rule, score, streak, running = false, endAt, timer, best = store.get('stroop', 0);
+  $('sBest').textContent = best;
+  const btns = COLORS.map((c, i) => {
+    const b = document.createElement('button'); b.className = 'sbtn'; b.disabled = true;
+    b.innerHTML = `<i style="background:${c.v}"></i>${c.name}`;
+    b.onclick = () => answer(i); $('sBtns').appendChild(b); return b;
+  });
+  function setRule(r){
+    rule = r; const el = $('sRule');
+    el.textContent = r === 'ink' ? 'TAP THE INK' : 'TAP THE WORD';
+    el.className = 'rule ' + r;
+  }
+  function newRound(){
+    word = Math.floor(Math.random()*4);
+    do{ ink = Math.floor(Math.random()*4); } while(ink === word && Math.random() < 0.85);
+    // rule flips get more frequent as score rises
+    if(Math.random() < Math.min(0.15 + score*0.01, 0.4)) setRule(rule === 'ink' ? 'word' : 'ink');
+    const w = $('sWord'); w.textContent = COLORS[word].name; w.style.color = COLORS[ink].v;
+    // shuffle button order every 5 points for extra challenge
+    if(score > 0 && score % 5 === 0){ shuffle([...btns]).forEach(b => $('sBtns').appendChild(b)); }
+  }
+  function answer(i){
+    if(!running) return;
+    const target = rule === 'ink' ? ink : word;
+    if(i === target){
+      streak++; score += streak >= 5 ? 2 : 1; beep(660, .07);
+      $('sMsg').textContent = streak >= 5 ? `🔥 Streak ×2` : ''; $('sMsg').className = 'msg good';
+    } else {
+      streak = 0; score = Math.max(0, score - 1); beep(140, .2);
+      $('sMsg').textContent = `✗ It was ${COLORS[target].name}`; $('sMsg').className = 'msg bad';
+    }
+    $('sScore').textContent = score; $('sStreak').textContent = streak;
+    newRound();
+  }
+  function tick(){
+    const left = Math.max(0, endAt - performance.now());
+    $('sBar').style.width = (left / (DURATION*1000) * 100) + '%';
+    if(left <= 0) return finish();
+    timer = requestAnimationFrame(tick);
+  }
+  function finish(){
+    running = false; btns.forEach(b => b.disabled = true);
+    $('sWord').textContent = 'TIME!'; $('sWord').style.color = 'var(--text)';
+    if(score > best){ best = score; store.set('stroop', best); $('sBest').textContent = best; $('sMsg').textContent = '🏆 New best!'; $('sMsg').className = 'msg good'; }
+    else { $('sMsg').textContent = `Final score: ${score}`; $('sMsg').className = 'msg'; }
+    $('sStart').style.display = ''; $('sStart').textContent = 'Play again';
+  }
+  $('sStart').onclick = () => {
+    score = 0; streak = 0; running = true; setRule('ink');
+    $('sScore').textContent = 0; $('sStreak').textContent = 0; $('sMsg').textContent = '';
+    $('sStart').style.display = 'none'; btns.forEach(b => b.disabled = false);
+    endAt = performance.now() + DURATION*1000; newRound(); cancelAnimationFrame(timer); tick();
+  };
+})();
+
+/* ================= GAME 3: NUMBER TRAIL ================= */
+(() => {
+  const grid = $('nGrid');
+  let next = 1, start = 0, penalty = 0, running = false, raf, best = store.get('trail', null);
+  if(best) $('nBest').textContent = best.toFixed(1);
+  function build(nums){
+    grid.innerHTML = '';
+    nums.forEach(n => {
+      const b = document.createElement('button'); b.className = 'ncell'; b.textContent = n;
+      b.onclick = () => tap(b, n); grid.appendChild(b);
+    });
+  }
+  build([...Array(25)].map((_, i) => i+1));
+  const elapsed = () => (performance.now() - start) / 1000 + penalty;
+  function tick(){ $('nTime').textContent = elapsed().toFixed(1); raf = requestAnimationFrame(tick); }
+  function tap(el, n){
+    if(!running || el.classList.contains('done')) return;
+    if(n === next){
+      el.classList.add('done'); beep(500 + n*12, .05); next++;
+      $('nNext').textContent = next <= 25 ? next : '✓';
+      if(next > 25) finish();
+    } else {
+      penalty += 2; beep(140, .2);
+      el.classList.add('miss'); setTimeout(() => el.classList.remove('miss'), 250);
+      $('nMsg').textContent = '+2s penalty'; $('nMsg').className = 'msg bad';
+    }
+  }
+  function finish(){
+    running = false; cancelAnimationFrame(raf);
+    const t = elapsed(); $('nTime').textContent = t.toFixed(1);
+    let note = t < 20 ? 'Elite focus 🧠⚡' : t < 30 ? 'Sharp! 👏' : t < 45 ? 'Solid — keep training' : 'Warm-up done, go again';
+    if(!best || t < best){ best = t; store.set('trail', best); $('nBest').textContent = t.toFixed(1); note = '🏆 New best! ' + note; }
+    $('nMsg').textContent = note; $('nMsg').className = 'msg good';
+    $('nStart').style.display = ''; $('nStart').textContent = 'Play again';
+  }
+  $('nStart').onclick = () => {
+    next = 1; penalty = 0; running = true;
+    $('nNext').textContent = 1; $('nMsg').textContent = '';
+    build(shuffle([...Array(25)].map((_, i) => i+1)));
+    grid.classList.remove('idle'); $('nStart').style.display = 'none';
+    start = performance.now(); tick();
+  };
+})();
+
+/* ================= GAME 4: QUICK MATH ================= */
+(() => {
+  const START_TIME = 20, MAX_TIME = 30;
+  let score, truth, running = false, endAt, raf, best = store.get('math', 0);
+  $('qBest').textContent = best;
+  const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  function makeEq(){
+    const lvl = Math.min(Math.floor(score / 4), 6);
+    const ops = lvl < 1 ? ['+'] : lvl < 2 ? ['+','−'] : lvl < 4 ? ['+','−','×'] : ['+','−','×','÷'];
+    const op = ops[rnd(0, ops.length - 1)];
+    const hi = 9 + lvl * 6;
+    let a, b, ans;
+    if(op === '+'){ a = rnd(2, hi); b = rnd(2, hi); ans = a + b; }
+    else if(op === '−'){ a = rnd(5, hi + 5); b = rnd(1, a - 1); ans = a - b; }
+    else if(op === '×'){ a = rnd(2, 4 + lvl * 2); b = rnd(2, 9 + lvl); ans = a * b; }
+    else { b = rnd(2, 9 + lvl); ans = rnd(2, 9 + lvl); a = b * ans; }
+    truth = Math.random() < 0.5;
+    let shown = ans;
+    if(!truth){
+      // plausible wrong answers: off by 1, off by 10, or off by one multiple
+      const tricks = [1, -1, 2, -2, 10, -10];
+      if(op === '×' || op === '÷') tricks.push(b, -b);
+      do{ shown = ans + tricks[rnd(0, tricks.length - 1)]; } while(shown === ans || shown < 0);
+    }
+    $('qEq').textContent = `${a} ${op} ${b} = ${shown}`;
+  }
+  function answer(said){
+    if(!running) return;
+    const eq = $('qEq');
+    if(said === truth){
+      score++; endAt = Math.min(endAt + 1200, performance.now() + MAX_TIME * 1000); beep(700, .06);
+      eq.className = 'eq flash-good'; $('qMsg').textContent = '+1.2s'; $('qMsg').className = 'msg good';
+    } else {
+      endAt -= 3000; beep(140, .2);
+      eq.className = 'eq flash-bad'; $('qMsg').textContent = '−3s'; $('qMsg').className = 'msg bad';
+    }
+    $('qScore').textContent = score;
+    setTimeout(() => { if(running){ eq.className = 'eq'; makeEq(); } }, 160);
+  }
+  function tick(){
+    const left = Math.max(0, endAt - performance.now());
+    $('qTime').textContent = Math.ceil(left / 1000);
+    $('qBar').style.width = Math.min(100, left / (MAX_TIME * 1000) * 100) + '%';
+    if(left <= 0) return finish();
+    raf = requestAnimationFrame(tick);
+  }
+  function finish(){
+    running = false; $('qYes').disabled = $('qNo').disabled = true;
+    $('qEq').className = 'eq'; $('qEq').textContent = 'TIME!';
+    if(score > best){ best = score; store.set('math', best); $('qBest').textContent = best; $('qMsg').textContent = `🏆 New best: ${score}`; $('qMsg').className = 'msg good'; }
+    else { $('qMsg').textContent = `Final score: ${score}`; $('qMsg').className = 'msg'; }
+    $('qStart').style.display = ''; $('qStart').textContent = 'Play again';
+  }
+  $('qYes').onclick = () => answer(true);
+  $('qNo').onclick = () => answer(false);
+  document.addEventListener('keydown', e => {
+    if(!running || !$('math').classList.contains('active')) return;
+    if(e.key === 'ArrowLeft'){ e.preventDefault(); answer(true); }
+    if(e.key === 'ArrowRight'){ e.preventDefault(); answer(false); }
+  });
+  $('qStart').onclick = () => {
+    score = 0; running = true; $('qScore').textContent = 0; $('qMsg').textContent = '';
+    $('qStart').style.display = 'none'; $('qYes').disabled = $('qNo').disabled = false;
+    endAt = performance.now() + START_TIME * 1000; makeEq(); cancelAnimationFrame(raf); tick();
+  };
+})();
+
+/* ================= GAME 5: ODD COLOR ================= */
+(() => {
+  const grid = $('oGrid'), DURATION = 60;
+  let level, lives, running = false, endAt, raf, oddIndex, best = store.get('odd', 0);
+  $('oBest').textContent = best;
+  const hearts = () => '❤️'.repeat(lives) + '🖤'.repeat(3 - lives);
+  function showIdle(){
+    grid.style.gridTemplateColumns = 'repeat(3,1fr)'; grid.innerHTML = '';
+    for(let i = 0; i < 9; i++){ const d = document.createElement('div'); d.className = 'ocell'; d.style.background = 'var(--panel2)'; grid.appendChild(d); }
+  }
+  showIdle();
+  function round(){
+    const size = Math.min(2 + Math.floor((level + 1) / 2), 8);       // 2×2 up to 8×8
+    const diff = Math.max(4, 28 - level * 1.3);                       // lightness gap shrinks
+    const h = Math.floor(Math.random() * 360), s = 55 + Math.floor(Math.random() * 30), l = 40 + Math.floor(Math.random() * 20);
+    const oddL = Math.random() < 0.5 ? l + diff : l - diff;
+    oddIndex = Math.floor(Math.random() * size * size);
+    grid.style.gridTemplateColumns = `repeat(${size},1fr)`; grid.innerHTML = '';
+    for(let i = 0; i < size * size; i++){
+      const b = document.createElement('button'); b.className = 'ocell';
+      b.style.background = `hsl(${h},${s}%,${i === oddIndex ? oddL : l}%)`;
+      b.onclick = () => pick(i, b); grid.appendChild(b);
+    }
+  }
+  function pick(i, el){
+    if(!running) return;
+    if(i === oddIndex){
+      level++; $('oLevel').textContent = level; beep(520 + level * 15, .07);
+      $('oMsg').textContent = ''; round();
+    } else {
+      lives--; $('oLives').textContent = hearts(); beep(140, .2);
+      const oddEl = grid.children[oddIndex];
+      oddEl.style.outline = '3px solid #fff'; oddEl.style.outlineOffset = '-3px';
+      $('oMsg').textContent = lives ? 'Missed! That was the odd one.' : ''; $('oMsg').className = 'msg bad';
+      running = false;
+      setTimeout(() => { if(lives <= 0) finish(); else { running = true; round(); } }, 700);
+    }
+  }
+  function tick(){
+    const left = Math.max(0, endAt - performance.now());
+    $('oTime').textContent = Math.ceil(left / 1000);
+    if(left <= 0) return finish();
+    raf = requestAnimationFrame(tick);
+  }
+  function finish(){
+    if(grid.classList.contains('idle')) return;
+    running = false; cancelAnimationFrame(raf); grid.classList.add('idle');
+    if(level > best){ best = level; store.set('odd', best); $('oBest').textContent = best; $('oMsg').textContent = `🏆 New best: level ${level}`; $('oMsg').className = 'msg good'; }
+    else { $('oMsg').textContent = `You reached level ${level}`; $('oMsg').className = 'msg'; }
+    $('oStart').style.display = ''; $('oStart').textContent = 'Play again';
+  }
+  $('oStart').onclick = () => {
+    level = 0; lives = 3; running = true;
+    $('oLevel').textContent = 0; $('oLives').textContent = hearts(); $('oMsg').textContent = '';
+    $('oStart').style.display = 'none'; grid.classList.remove('idle');
+    endAt = performance.now() + DURATION * 1000; round(); cancelAnimationFrame(raf); tick();
+  };
+})();
+</script>
+</body>
+</html>
